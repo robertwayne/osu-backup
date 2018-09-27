@@ -54,7 +54,8 @@ def backup_procedure():
                         if not path.exists(f'{BACKUP_PATH}/{directory}/{file}'):
                             copy2(f'{directory}/{file}', f'{BACKUP_PATH}/{directory}/{file}')
                             logging.info('Successfully added ' + file + ' in ' + str(directory))
-                        elif stat(f'{directory}/{file}').st_mtime - stat(f'{BACKUP_PATH}/{directory}/{file}').st_mtime > 1:
+                        elif stat(f'{directory}/{file}').st_mtime - \
+                                stat(f'{BACKUP_PATH}/{directory}/{file}').st_mtime > 1:
                             copy2(f'{BACKUP_PATH}/{file}', f'{BACKUP_PATH}/{directory}/{file}')
                             logging.info('Successfully updated ' + file + ' in ' + str(directory))
         except OSError:
@@ -69,7 +70,8 @@ def backup_procedure():
                             remove(f'{BACKUP_PATH}/{directory}/{file}')
                             logging.info('Successfully removed ' + str(file) + ' from ' + str(directory))
                     except OSError:
-                        logging.error(get_time() + 'Could not remove ' + str(file) + ' in ' + str(directory), exc_info=True)
+                        logging.error(get_time() + 'Could not remove ' + str(file) + ' in '
+                                      + str(directory), exc_info=True)
 
 
 def archive():
