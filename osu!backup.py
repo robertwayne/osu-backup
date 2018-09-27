@@ -19,15 +19,15 @@ logging.basicConfig(filename='debug.log', level=logging.DEBUG)
 BACKUP_PATH = './backup'
 WINDOWS_USER = getlogin()
 
+file_strings = ['osu!.db', 'collection.db', 'scores.db', 'osu!.cfg', f'osu!.{WINDOWS_USER}.cfg']
+directories = ['Screenshots', 'Replays']
+
 
 def get_time():
     return str(datetime.datetime.utcnow()) + ': '
 
 
 def backup_procedure():
-    file_strings = ['osu!.db', 'collection.db', 'scores.db', 'osu!.cfg', f'osu!.{WINDOWS_USER}.cfg']
-    directories = ['Screenshots', 'Replays']
-
     for file in file_strings:
         try:
             if not path.exists(f'{BACKUP_PATH}/{file}'):
@@ -75,8 +75,13 @@ def backup_procedure():
 
 
 def archive():
-    make_archive('backup-{}'.format(datetime.date.today()), 'zip', root_dir=BACKUP_PATH)
-    logging.info(get_time() + 'Successfully created archive of backup directory')
+    current_date = datetime.date.today()
+
+    try:
+        make_archive(f'backup-{current_date}', 'zip', root_dir=BACKUP_PATH)
+        logging.info(get_time() + 'Successfully created archive of backup directory')
+    except OSError:
+        logging.error(get_time() + 'Could not create archive', exc_info=True)
 
 
 # TODO: Implement upload to a Google Drive
@@ -89,19 +94,17 @@ def main():
     if not path.isdir(f'{BACKUP_PATH}'):
         try:
             mkdir(f'{BACKUP_PATH}')
-            logging.info(str(datetime.datetime.utcnow()) + f': Created backup directory at {BACKUP_PATH}')
+            logging.info(get_time() + f': Created backup directory at {BACKUP_PATH}')
         except OSError:
-            logging.info(str(datetime.datetime.utcnow()) + ': Failed to create directory', exc_info=True)
+            logging.info(get_time() + ': Failed to create directory', exc_info=True)
 
-    try:
-        backup_procedure()
-    finally:
-        archive()
-        # sync()
+    backup_procedure()
 
 
 if __name__ == '__main__':
+    logging.info(get_time() + 'Started running...')
     schedule.every().hour.do(main)
+    schedule.every().day.do(archive)
     while True:
         schedule.run_pending()
         time.sleep(60)

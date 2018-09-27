@@ -1,6 +1,14 @@
 #
 *.ini
 TODO.txt
+*.zip
+
+# osu! specific -- for testing purposes
+*.db
+*.cfg
+Replays/
+Screenshots/
+Skins/
 
 
 # Byte-compiled / optimized / DLL files
