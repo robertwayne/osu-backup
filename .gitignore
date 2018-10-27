@@ -1,9 +1,11 @@
-#
+# Stuff
 *.ini
 TODO.txt
 *.zip
+credentials.json
 
 # osu! specific -- for testing purposes
+osu!backup
 *.db
 *.cfg
 Replays/
