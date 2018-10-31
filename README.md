@@ -2,14 +2,7 @@
 osu.db, in-game settings, collections.db, replays, and screenshots files. 
 
 
-**TODO**
-
-[_] Add online sync between computers through a Google Drive account.
-
-[_] Change archive function to run weekly with automatic uploads.
-
-
 **How To Use**
-1. Add osu!backup.py to osu! directory.
-2. Install requirements via *pip install -r requirements.txt*
-3. Run script via *py osu!backup.py* (Python 3.6+)
+1. Add *osu!backup.py* and *requirements.txt* to osu! base directory
+2. Install requirements via *py -m pip install -r requirements.txt*
+3. Run script via *py osu!backup.py* (requires Python 3.6+)
