@@ -15,12 +15,19 @@ from shutil import copytree, copy2, make_archive
 
 import schedule
 
-logging.basicConfig(filename='debug.log', level=logging.DEBUG)
-BACKUP_PATH = './backup'
-WINDOWS_USER = getlogin()
+from pydrive.auth import GoogleAuth
+from pydrive.drive import GoogleDrive
 
-file_strings = ['osu!.db', 'collection.db', 'scores.db', 'osu!.cfg', f'osu!.{WINDOWS_USER}.cfg']
+logging.basicConfig(filename='debug.log', level=logging.DEBUG)
+BACKUP_PATH = './osu!backup'
+DRIVE_DIRECTORY = 'osu!backup'
+LOGGED_IN_USER = getlogin()
+
+file_strings = ['osu!.db', 'collection.db', 'scores.db', 'osu!.cfg', f'osu!.{LOGGED_IN_USER}.cfg']
 directories = ['Screenshots', 'Replays']
+
+gauth = GoogleAuth()
+drive = GoogleDrive()
 
 
 def get_time():
@@ -39,7 +46,7 @@ def backup_procedure():
         except OSError:
             logging.error(get_time() + 'Could not backup ' + str(file), exc_info=True)
 
-# Look through local directories; add directory if it does not exist.
+    # Look through local directories; add directory if it does not exist.
     for directory in directories:
         try:
             if not path.exists(f'{BACKUP_PATH}/{directory}'):
@@ -61,33 +68,96 @@ def backup_procedure():
         except OSError:
             logging.error(get_time() + 'Could not backup ' + str(directory), exc_info=True)
 
-# Look for local files in the backup directory which no longer exist and delete them.
+    # Look for local files in the backup directory which no longer exist and delete them.
     for directory in directories:
-            for root, dirs, files in walk(f'{BACKUP_PATH}/{directory}'):
-                for file in files:
-                    try:
-                        if not path.exists(f'{directory}/{file}'):
-                            remove(f'{BACKUP_PATH}/{directory}/{file}')
-                            logging.info('Successfully removed ' + str(file) + ' from ' + str(directory))
-                    except OSError:
-                        logging.error(get_time() + 'Could not remove ' + str(file) + ' in '
-                                      + str(directory), exc_info=True)
+        for root, dirs, files in walk(f'{BACKUP_PATH}/{directory}'):
+            for file in files:
+                try:
+                    if not path.exists(f'{directory}/{file}'):
+                        remove(f'{BACKUP_PATH}/{directory}/{file}')
+                        logging.info('Successfully removed ' + str(file) + ' from ' + str(directory))
+                except OSError:
+                    logging.error(get_time() + 'Could not remove ' + str(file) + ' in '
+                                  + str(directory), exc_info=True)
 
 
 def archive():
     current_date = datetime.date.today()
 
     try:
+        # root_dir and base_dir must be set like that to avoid the archive adding itself to archives
         make_archive(f'backup-{current_date}', 'zip', root_dir=BACKUP_PATH)
         logging.info(get_time() + 'Successfully created archive of backup directory')
     except OSError:
         logging.error(get_time() + 'Could not create archive', exc_info=True)
 
 
-# TODO: Implement upload to a Google Drive
-# TODO: Implement sync: check Drive for file first, if False check for local files, if False, create files?
 def sync():
-    return False
+    directory_list = drive.ListFile({'q': "'root' in parents and trashed=false"}).GetList()
+    try:
+        if not path.exists(f'{BACKUP_PATH}/drive_settings.txt'):
+            # check if drive folder exists under title; if yes - create settings.txt w/ ID if no - create folder & local
+            for directory in directory_list:
+                if directory['title'] == DRIVE_DIRECTORY:
+                    directory_id = directory['id']
+                    create_drive_settings(directory_id)
+                    print('dir found, created settings.txt')
+                    break
+                else:
+                    # uh... create the directory, then create the settings file (dir func returns ID so pass it in)...
+                    create_drive_settings(create_drive_directory())
+                    print('upload new dir')
+                    break
+    finally:
+        for directory in directory_list:
+            local_file = open(f'{DRIVE_DIRECTORY}/drive_settings.txt', 'r')
+            directory_id = local_file.readline()
+            local_file.close()
+
+            if directory['id'] == directory_id:
+                for root, dirs, files in walk(top='.'):
+                    for file in files:
+                        if file.startswith('backup') and file.endswith('.zip'):
+                            f = drive.CreateFile({'title': file.title().lower(),
+                                                  'parents': [{'id': directory_id}],
+                                                  'mimeType': 'application/zip'})
+                            f.SetContentFile(f'{file}')
+
+                            drive_files = drive.ListFile(
+                                {'q': f"'{directory_id}' in parents and trashed=false"}).GetList()
+                            if not drive_files:
+                                f.Upload()
+                            elif drive_files:
+                                for drive_file in drive_files:
+                                    if drive_file['mimeType'] == 'application/zip':
+                                        if drive_file['title'] == file.title().lower():
+                                            drive_file.Delete()
+                                            f.Upload()
+
+
+def delete_local_archive():
+    for root, dirs, files in walk('.'):
+        for file in files:
+            if file.startswith('backup') and file.endswith('.zip'):
+                remove(file)
+                print('removed local archive')
+
+
+# take a drive folder ID and write it to drive_settings.txt
+def create_drive_settings(directory_id):
+    local_file = open(f'{BACKUP_PATH}/drive_settings.txt', 'w')
+    local_file.write(directory_id)
+    local_file.close()
+    print('dir found, created settings.txt')
+
+
+def create_drive_directory():
+    d = drive.CreateFile({'title': DRIVE_DIRECTORY,
+                          'mimeType': 'application/vnd.google-apps.folder'})
+    d.Upload()
+    directory_id = d['id']
+
+    return directory_id
 
 
 def main():
@@ -103,8 +173,12 @@ def main():
 
 if __name__ == '__main__':
     logging.info(get_time() + 'Started running...')
+
     schedule.every().hour.do(main)
     schedule.every().day.do(archive)
+    schedule.every().day.do(sync)
+    schedule.every(25).hours.do(delete_local_archive())
+
     while True:
         schedule.run_pending()
         time.sleep(60)
