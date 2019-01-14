@@ -18,24 +18,25 @@ import schedule
 from pydrive.auth import GoogleAuth
 from pydrive.drive import GoogleDrive
 
-logging.basicConfig(filename='debug.log', level=logging.DEBUG)
+
 BACKUP_PATH = './osu!backup'
 DRIVE_DIRECTORY = 'osu!backup'
 LOGGED_IN_USER = getlogin()
 
-file_strings = ['osu!.db', 'collection.db', 'scores.db', 'osu!.cfg', f'osu!.{LOGGED_IN_USER}.cfg']
-directories = ['Screenshots', 'Replays']
+osu_files = ['osu!.db', 'collection.db', 'scores.db', 'osu!.cfg', f'osu!.{LOGGED_IN_USER}.cfg']
+osu_dirs = ['Screenshots', 'Replays']
 
 gauth = GoogleAuth()
 drive = GoogleDrive()
 
 
 def get_time():
+    """"Returns the current UTC date-time with the type string and a colon for spacing in logging files."""
     return str(datetime.datetime.utcnow()) + ': '
 
 
 def backup_procedure():
-    for file in file_strings:
+    for file in osu_files:
         try:
             if not path.exists(f'{BACKUP_PATH}/{file}'):
                 copy2(file, BACKUP_PATH)
@@ -46,8 +47,8 @@ def backup_procedure():
         except OSError:
             logging.error(get_time() + 'Could not backup ' + str(file), exc_info=True)
 
-    # Look through local directories; add directory if it does not exist.
-    for directory in directories:
+    # Look through local directory; add directory if it does not exist.
+    for directory in osu_dirs:
         try:
             if not path.exists(f'{BACKUP_PATH}/{directory}'):
                 copytree(directory, f'{BACKUP_PATH}/{directory}')
@@ -69,7 +70,7 @@ def backup_procedure():
             logging.error(get_time() + 'Could not backup ' + str(directory), exc_info=True)
 
     # Look for local files in the backup directory which no longer exist and delete them.
-    for directory in directories:
+    for directory in osu_dirs:
         for root, dirs, files in walk(f'{BACKUP_PATH}/{directory}'):
             for file in files:
                 try:
@@ -82,14 +83,12 @@ def backup_procedure():
 
 
 def archive():
-    current_date = datetime.date.today()
-
+    """"Creates a .zip file appended with the current date of the most recent back-up directory."""
     try:
-        # root_dir and base_dir must be set like that to avoid the archive adding itself to archives
-        make_archive(f'backup-{current_date}', 'zip', root_dir=BACKUP_PATH)
-        logging.info(get_time() + 'Successfully created archive of backup directory')
+        make_archive(f'backup-{datetime.datetime.today()}', 'zip', root_dir=BACKUP_PATH)
+        logging.info(get_time() + 'Successfully created archive of backup directory.')
     except OSError:
-        logging.error(get_time() + 'Could not create archive', exc_info=True)
+        logging.error(get_time() + 'Error creating archive. Does the backup directory exist?', exc_info=True)
 
 
 def sync():
@@ -101,12 +100,10 @@ def sync():
                 if directory['title'] == DRIVE_DIRECTORY:
                     directory_id = directory['id']
                     create_drive_settings(directory_id)
-                    print('dir found, created settings.txt')
                     break
                 else:
                     # uh... create the directory, then create the settings file (dir func returns ID so pass it in)...
                     create_drive_settings(create_drive_directory())
-                    print('upload new dir')
                     break
     finally:
         for directory in directory_list:
@@ -129,29 +126,33 @@ def sync():
                                 f.Upload()
                             elif drive_files:
                                 for drive_file in drive_files:
-                                    if drive_file['mimeType'] == 'application/zip':
-                                        if drive_file['title'] == file.title().lower():
+                                    if drive_file['mimeType'] == 'application/zip' \
+                                            and drive_file['title'] == file.title().lower():
                                             drive_file.Delete()
                                             f.Upload()
 
 
 def delete_local_archive():
+    """"Deletes any .zip files in the root directory starting with 'backup'."""
     for root, dirs, files in walk('.'):
         for file in files:
             if file.startswith('backup') and file.endswith('.zip'):
                 remove(file)
-                print('removed local archive')
 
 
-# take a drive folder ID and write it to drive_settings.txt
 def create_drive_settings(directory_id):
+    """"Creates a new file containing Google Drive settings.
+
+    Keyword arguments:
+        directory_id -- a Google Drive directories' internal ID
+    """
     local_file = open(f'{BACKUP_PATH}/drive_settings.txt', 'w')
     local_file.write(directory_id)
     local_file.close()
-    print('dir found, created settings.txt')
 
 
 def create_drive_directory():
+    """"Creates a new Google Drive directory and returns the internal ID."""
     d = drive.CreateFile({'title': DRIVE_DIRECTORY,
                           'mimeType': 'application/vnd.google-apps.folder'})
     d.Upload()
@@ -160,24 +161,29 @@ def create_drive_directory():
     return directory_id
 
 
-def main():
+def create_backup_directory():
+    """Creates a new backup directory if one does not exist."""
     if not path.isdir(f'{BACKUP_PATH}'):
         try:
             mkdir(f'{BACKUP_PATH}')
-            logging.info(get_time() + f': Created backup directory at {BACKUP_PATH}')
+            logging.info(get_time() + f'Created backup directory at {BACKUP_PATH}')
         except OSError:
-            logging.info(get_time() + ': Failed to create directory', exc_info=True)
+            logging.info(get_time() + 'Failed to create directory.', exc_info=True)
 
-    backup_procedure()
+
+def main():
+    """Schedules each backup-related task to a timer."""
+    logging.basicConfig(filename='debug.log', level=logging.DEBUG)
+    logging.info(get_time() + 'Started running...')
+
+    schedule.every().hour.do(backup_procedure())
+    schedule.every().day.do(archive())
+    schedule.every().day.do(sync())
+    schedule.every(25).hours.do(delete_local_archive())
 
 
 if __name__ == '__main__':
-    logging.info(get_time() + 'Started running...')
-
-    schedule.every().hour.do(main)
-    schedule.every().day.do(archive)
-    schedule.every().day.do(sync)
-    schedule.every(25).hours.do(delete_local_archive())
+    # Only run if this file is called directly.
 
     while True:
         schedule.run_pending()
