@@ -31,7 +31,7 @@ drive = GoogleDrive()
 
 
 def get_time():
-    """"Returns the current UTC date-time with the type string and a colon for spacing in logging files."""
+    """Returns the current UTC date-time with the type string and a colon for spacing in logging files."""
     return str(datetime.datetime.utcnow()) + ': '
 
 
@@ -83,7 +83,7 @@ def backup_procedure():
 
 
 def archive():
-    """"Creates a .zip file appended with the current date of the most recent back-up directory."""
+    """Creates a .zip file appended with the current date of the most recent back-up directory."""
     try:
         make_archive(f'backup-{datetime.datetime.today()}', 'zip', root_dir=BACKUP_PATH)
         logging.info(get_time() + 'Successfully created archive of backup directory.')
@@ -133,7 +133,7 @@ def sync():
 
 
 def delete_local_archive():
-    """"Deletes any .zip files in the root directory starting with 'backup'."""
+    """Deletes any .zip files in the root directory starting with 'backup'."""
     for root, dirs, files in walk('.'):
         for file in files:
             if file.startswith('backup') and file.endswith('.zip'):
@@ -141,7 +141,7 @@ def delete_local_archive():
 
 
 def create_drive_settings(directory_id):
-    """"Creates a new file containing Google Drive settings.
+    """Creates a new file containing Google Drive settings.
 
     Keyword arguments:
         directory_id -- a Google Drive directories' internal ID
@@ -152,7 +152,7 @@ def create_drive_settings(directory_id):
 
 
 def create_drive_directory():
-    """"Creates a new Google Drive directory and returns the internal ID."""
+    """Creates a new Google Drive directory and returns the internal ID."""
     d = drive.CreateFile({'title': DRIVE_DIRECTORY,
                           'mimeType': 'application/vnd.google-apps.folder'})
     d.Upload()
