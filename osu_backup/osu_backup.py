@@ -1,5 +1,5 @@
 #############################################################
-#   osu!backup is a python script that provides regular     #
+#   osu-backup is a python script that provides regular     #
 #   local and online backups of your scores.db, skins,      #
 #   osu.db, in-game settings, collections.db,               #
 #   replays, and screenshots files.                         #
